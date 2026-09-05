@@ -1,0 +1,6 @@
+{
+  "name": "Mind Switch",
+  "description": "Fast-paced cognitive flexibility and brain-training game with 10 progressive rounds.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

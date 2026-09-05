@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0A0A0B;
+  --bg-panel: #0D0D12;
+  --card: #111116;
+  --border: #1E293B;
+  --accent: #38BDF8;
+  --text: #F8FAFC;
+  --text-muted: #64748B;
+  --correct: #22C55E;
+  --wrong: #EF4444;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.screen {
+  animation: screenFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes screenFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mind Switch</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #38bdf8;
+            --text: #f8fafc;
+            --correct: #22c55e;
+            --wrong: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* UI Screens */
+        .screen {
+            display: none;
+            flex-direction: column;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .screen.active { display: flex; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Stats Bar */
+        #game-stats {
+            position: fixed;
+            top: 20px;
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            font-weight: bold;
+            opacity: 0.9;
+            background: rgba(30, 41, 59, 0.7);
+            padding: 10px 16px;
+            border-radius: 14px;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Game Area */
+        #target-display {
+            background: var(--card);
+            height: 250px;
+            width: 100%;
+            border-radius: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 5rem;
+            font-weight: 800;
+            margin: 20px 0;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+            border: 2px solid transparent;
+            transition: all 0.1s ease;
+            cursor: pointer;
+        }
+
+        .rule-notice {
+            font-size: 1.1rem;
+            color: var(--accent);
+            min-height: 3em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 10px;
+            font-weight: 600;
+        }
+
+        /* Buttons */
+        .btn {
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            padding: 18px 32px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--accent);
+            color: var(--accent);
+        }
+
+        .btn:active { opacity: 0.7; transform: scale(0.98); }
+
+        /* Performance Report Styles */
+        .report-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 12px;
+            text-align: left;
+        }
+        .stat-label { font-size: 0.7rem; text-transform: uppercase; opacity: 0.6; }
+        .stat-val { font-size: 1.5rem; font-weight: bold; display: block; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+    <!-- Start Screen -->
+    <div id="screen-start" class="screen active">
+        <h1 style="font-size: 3rem; margin-bottom: 0;">Mind Switch</h1>
+        <p style="opacity: 0.7; margin-bottom: 40px;">Adapt. Remember. Focus.</p>
+        <button class="btn" onclick="startGame()">Start Game</button>
+        <p style="margin-top: 20px; font-size: 0.8rem;">High Score: <span id="high-score">0</span></p>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="screen-game" class="screen">
+        <div id="game-stats">
+            <div id="timer">10s</div>
+            <div id="round-num">Round 1/10</div>
+            <div id="score-display">Score: 0</div>
+        </div>
+        <div class="rule-notice" id="rule-text">Tap when number is > 5</div>
+        <div id="target-display" onclick="handleInput()">?</div>
+        <div style="font-size: 0.8rem; opacity: 0.5;">Tap the box (or press Space) if the rule matches the target!</div>
+    </div>
+
+    <!-- Report Screen -->
+    <div id="screen-report" class="screen">
+        <h2>Performance Report</h2>
+        <div class="report-grid">
+            <div class="stat-box"><span class="stat-label">Final Score</span><span class="stat-val" id="res-score">0</span></div>
+            <div class="stat-box"><span class="stat-label">Accuracy</span><span class="stat-val" id="res-acc">0%</span></div>
+            <div class="stat-box"><span class="stat-label">Max Streak</span><span class="stat-val" id="res-streak">0</span></div>
+            <div class="stat-box"><span class="stat-label">Rounds Cleared</span><span class="stat-val" id="res-rounds">0</span></div>
+        </div>
+        <button class="btn" onclick="restartGame()">Try Again</button>
+        <button class="btn btn-outline" onclick="location.reload()">Main Menu</button>
+    </div>
+
+    <script>
+        const ROUND_TIME = 10;
+        const INTERVAL_SPEED = 1200; // Time per stimulus (ms)
+        
+        let state = {
+            round: 0,
+            score: 0,
+            totalAttempts: 0,
+            correctClicks: 0,
+            streak: 0,
+            maxStreak: 0,
+            timeLeft: ROUND_TIME,
+            timerId: null,
+            stimulusId: null,
+            currentTarget: null,
+            previousTarget: null,
+            gameActive: false,
+            hasRespondedToStimulus: false
+        };
+
+        const rules = [
+            { id: 1, text: "Tap numbers GREATER than 5", check: (val) => typeof val === 'number' && val > 5 },
+            { id: 2, text: "Tap EVEN numbers", check: (val) => typeof val === 'number' && val % 2 === 0 },
+            { id: 3, text: "Tap the word matching its color", check: (val) => val && val.word === val.color },
+            { id: 4, text: "Tap ONLY if the font color is RED", check: (val) => val && val.color === 'RED' },
+            { id: 5, text: "Tap if current is HIGHER than last", check: (val, last) => typeof val === 'number' && typeof last === 'number' && val > last },
+            { id: 6, text: "Tap words NOT matching their color", check: (val) => val && val.word !== val.color },
+            { id: 7, text: "Tap numbers DIVISIBLE by 3", check: (val) => typeof val === 'number' && val % 3 === 0 },
+            { id: 8, text: "Tap if current matches 1 step back", check: (val, last) => typeof val === 'number' && typeof last === 'number' && val === last },
+            { id: 9, text: "Tap BLUE words OR Even numbers", check: (val) => (val && val.word === 'BLUE') || (typeof val === 'number' && val % 2 === 0) },
+            { id: 10, text: "Reverse Stroop: Tap if word means RED", check: (val) => val && val.word === 'RED' }
+        ];
+
+        const colors = ['RED', 'BLUE', 'GREEN', 'YELLOW'];
+        const colorHex = { RED: '#ef4444', BLUE: '#38bdf8', GREEN: '#22c55e', YELLOW: '#facc15' };
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function startGame() {
+            state = { ...state, round: 0, score: 0, totalAttempts: 0, correctClicks: 0, streak: 0, maxStreak: 0, gameActive: true };
+            updateHighScoreDisplay();
+            startRound();
+            showScreen('screen-game');
+        }
+
+        function startRound() {
+            state.timeLeft = ROUND_TIME;
+            document.getElementById('round-num').innerText = `Round ${state.round + 1}/10`;
+            document.getElementById('rule-text').innerText = rules[state.round].text;
+            
+            clearInterval(state.timerId);
+            state.timerId = setInterval(() => {
+                state.timeLeft--;
+                document.getElementById('timer').innerText = state.timeLeft + "s";
+                if (state.timeLeft <= 0) nextRound();
+            }, 1000);
+
+            nextStimulus();
+            clearInterval(state.stimulusId);
+            state.stimulusId = setInterval(nextStimulus, INTERVAL_SPEED);
+        }
+
+        function nextStimulus() {
+            state.previousTarget = state.currentTarget;
+            state.hasRespondedToStimulus = false;
+            const currentRule = rules[state.round];
+            
+            if ([1, 2, 5, 7, 8].includes(currentRule.id)) {
+                if (currentRule.id === 8 && state.previousTarget !== null && Math.random() < 0.4) {
+                    state.currentTarget = state.previousTarget;
+                } else {
+                    state.currentTarget = Math.floor(Math.random() * 10);
+                }
+                renderDisplay(state.currentTarget, 'white');
+            } else if (currentRule.id === 9) {
+                if (Math.random() < 0.5) {
+                    state.currentTarget = Math.floor(Math.random() * 10);
+                    renderDisplay(state.currentTarget, 'white');
+                } else {
+                    const word = Math.random() < 0.4 ? 'BLUE' : colors[Math.floor(Math.random() * colors.length)];
+                    const color = colors[Math.floor(Math.random() * colors.length)];
+                    state.currentTarget = { word, color };
+                    renderDisplay(word, color);
+                }
+            } else {
+                const word = colors[Math.floor(Math.random() * colors.length)];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                state.currentTarget = { word, color };
+                renderDisplay(word, color);
+            }
+        }
+
+        function renderDisplay(content, color) {
+            const display = document.getElementById('target-display');
+            display.innerText = content;
+            display.style.color = color === 'white' ? 'var(--text)' : (colorHex[color] || color.toLowerCase());
+            display.style.borderColor = 'transparent';
+        }
+
+        function handleInput() {
+            if (!state.gameActive || state.hasRespondedToStimulus) return;
+            state.hasRespondedToStimulus = true;
+
+            const currentRule = rules[state.round];
+            const isCorrect = currentRule.check(state.currentTarget, state.previousTarget);
+            
+            const display = document.getElementById('target-display');
+            state.totalAttempts++;
+
+            if (isCorrect) {
+                state.score += 10 + (state.streak * 2);
+                state.correctClicks++;
+                state.streak++;
+                state.maxStreak = Math.max(state.streak, state.maxStreak);
+                display.style.borderColor = 'var(--correct)';
+            } else {
+                state.score = Math.max(0, state.score - 5);
+                state.streak = 0;
+                display.style.borderColor = 'var(--wrong)';
+            }
+            
+            document.getElementById('score-display').innerText = `Score: ${state.score}`;
+            setTimeout(() => display.style.borderColor = 'transparent', 200);
+        }
+
+        function nextRound() {
+            state.round++;
+            if (state.round >= 10) {
+                endGame();
+            } else {
+                startRound();
+            }
+        }
+
+        function endGame() {
+            state.gameActive = false;
+            clearInterval(state.timerId);
+            clearInterval(state.stimulusId);
+            
+            const acc = state.totalAttempts > 0 ? Math.round((state.correctClicks / state.totalAttempts) * 100) : 0;
+            
+            document.getElementById('res-score').innerText = state.score;
+            document.getElementById('res-acc').innerText = acc + "%";
+            document.getElementById('res-streak').innerText = state.maxStreak;
+            document.getElementById('res-rounds').innerText = state.round;
+            
+            const high = parseInt(localStorage.getItem('mindSwitchHigh') || '0', 10);
+            if (state.score > high) localStorage.setItem('mindSwitchHigh', state.score);
+            
+            showScreen('screen-report');
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        function updateHighScoreDisplay() {
+            document.getElementById('high-score').innerText = localStorage.getItem('mindSwitchHigh') || 0;
+        }
+
+        // Spacebar key handling
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && state.gameActive) {
+                e.preventDefault();
+                handleInput();
+            }
+        });
+
+        window.onload = updateHighScoreDisplay;
+    </script>
+</body>
+</html>
